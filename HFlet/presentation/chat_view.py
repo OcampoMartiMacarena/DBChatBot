@@ -54,7 +54,7 @@ class MessageBubble(ft.Container):
         else:
             self.margin = ft.margin.only(left=10, right=80, top=5, bottom=5)
             
-class ChatView(ft.UserControl):
+class ChatView(ft.UserControl):  # Change back to UserControl for now
     def __init__(self, on_send: Callable[[str], None], expand: bool = False):
         super().__init__()
         self.on_send = on_send

@@ -1,7 +1,10 @@
+from enum import Enum, auto
 from pydantic import BaseModel, Field
 from typing import Protocol, List, Callable
-from domain.mock_dialogue_processor import MockDialogueProcessor, Message, ChatHistoryManager
+from domain.api_dialogue_processor import APIDialogueProcessor, ChatHistoryManager
 import flet as ft
+
+
 
 class ViewProtocol(Protocol):
     def get_user_message(self) -> str: ...
@@ -18,12 +21,53 @@ class BotResponse(BaseModel):
 class ChatModel(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
 
+class Intent(Enum):
+    # ACCOUNT
+    CREATE_ACCOUNT = auto()
+    DELETE_ACCOUNT = auto()
+    EDIT_ACCOUNT = auto()
+    SWITCH_ACCOUNT = auto()
+
+    # CANCELLATION_FEE
+    CHECK_CANCELLATION_FEE = auto()
+
+    # DELIVERY
+    DELIVERY_OPTIONS = auto()
+
+    # FEEDBACK
+    COMPLAINT = auto()
+    REVIEW = auto()
+
+    # INVOICE
+    CHECK_INVOICE = auto()
+    GET_INVOICE = auto()
+
+    # NEWSLETTER
+    NEWSLETTER_SUBSCRIPTION = auto()
+
+    # ORDER
+    CANCEL_ORDER = auto()
+    CHANGE_ORDER = auto()
+    PLACE_ORDER = auto()
+
+    # PAYMENT
+    CHECK_PAYMENT_METHODS = auto()
+    PAYMENT_ISSUE = auto()
+
+    # REFUND
+    CHECK_REFUND_POLICY = auto()
+    TRACK_REFUND = auto()
+
+    # SHIPPING_ADDRESS
+    CHANGE_SHIPPING_ADDRESS = auto()
+    SET_UP_SHIPPING_ADDRESS = auto()
+
 class ChatPresenter:
     def __init__(self, view: ViewProtocol, page: ft.Page):
         self.model = ChatModel()
         self.view = view
         self.page = page
-        self.dialogue_processor = MockDialogueProcessor()
+        self.dialogue_processor = APIDialogueProcessor()
         self.chat_history_manager = ChatHistoryManager()
 
     
@@ -45,7 +89,7 @@ class ChatPresenter:
         # Add user message to chat history manager
         self.chat_history_manager.add_message("user", message)
 
-        # Generate bot response using MockDialogueProcessor
+        # Generate bot response using APIDialogueProcessor
         self.dialogue_processor.generate_response(self.chat_history_manager)
 
         # Get the bot response from the chat history manager
