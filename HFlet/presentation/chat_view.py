@@ -1,5 +1,5 @@
 import flet as ft
-from .chat_model_presenter import ChatPresenter
+from typing import Callable
 
 class InputRow(ft.Row):
     def __init__(self, on_submit, *args, **kwargs):
@@ -28,20 +28,21 @@ class MessageBubble(ft.Container):
         super().__init__()
         self.padding = ft.padding.all(8)
         self.border_radius = ft.border_radius.all(10)
-        self.bgcolor = "#EC6C5B" if is_user else "#FFA07A"  # Different colors for user and bot messages
+        self.bgcolor = "#F0636C" if is_user else "#4A5459"  # Coral-red for user, dark blue-gray for bot
         
         text = ft.Text(
             message,
             size=14,
-            overflow=ft.TextOverflow.VISIBLE,  # Allow the text to be fully visible
-            no_wrap=False,  # Enable wrapping for long messages
-            text_align=ft.TextAlign.LEFT,  # Ensure text aligns from left to right
+            overflow=ft.TextOverflow.VISIBLE,
+            no_wrap=False,
+            text_align=ft.TextAlign.LEFT,
+            color="white",  # White text for both user and bot messages
         )
         
         text_container = ft.Container(
             content=text,
             padding=ft.padding.all(4),
-            alignment=ft.alignment.center_left,  # Align text to the left within the container
+            alignment=ft.alignment.center_left,
         )
         
         self.content = text_container
@@ -53,52 +54,56 @@ class MessageBubble(ft.Container):
         else:
             self.margin = ft.margin.only(left=10, right=80, top=5, bottom=5)
             
-class ChatView(ft.Container):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.presenter = ChatPresenter(self)
-        self.input_row = ft.Ref[InputRow]()
-        self.messages_column = ft.Column(scroll="auto", expand=True, spacing=10)
+class ChatView(ft.UserControl):
+    def __init__(self, on_send: Callable[[str], None], expand: bool = False):
+        super().__init__()
+        self.on_send = on_send
+        self.expand = expand
+        self.chat_messages = ft.Column(scroll="auto", expand=True)
+        self.user_input = ft.TextField(
+            hint_text="Type your message here...",
+            expand=True,
+            on_submit=self.send_message
+        )
+        self.send_button = ft.IconButton(
+            icon=ft.icons.SEND,
+            on_click=self.send_message
+        )
 
     def build(self):
-        self.content = ft.Column([
-            ft.Text("Chat", size=20, weight="bold"),
-            self.messages_column,
-            InputRow(
-                ref=self.input_row,
-                on_submit=self.on_submit,
-            )
-        ], expand=True)
+        return ft.Column([
+            self.chat_messages,
+            ft.Row([
+                self.user_input,
+                self.send_button
+            ])
+        ], expand=self.expand)
 
-    def on_submit(self, e):
-        text = self.input_row.current.text_input.current.value
-        if text.strip():
-            self.add_message(text, is_user=True)
-            self.presenter.process_user_message(text)
-            self.clear_input()
+    def send_message(self, _):
+        message = self.user_input.value
+        if message:
+            self.on_send(message)
 
-    def add_message(self, message: str, is_user: bool):
-        self.messages_column.controls.append(MessageBubble(message, is_user))
-        self.update()
-
-    def clear_input(self):
-        self.input_row.current.text_input.current.value = ""
-        self.update()
-
-    # Implement ViewProtocol methods
     def get_user_message(self) -> str:
-        return self.input_row.current.text_input.current.value
+        return self.user_input.value
 
     def display_bot_message(self, message: str):
-        self.add_message(message, is_user=False)
+        self.chat_messages.controls.append(MessageBubble(message, is_user=False))
+        self.chat_messages.update()
+
+    def display_user_message(self, message: str):
+        self.chat_messages.controls.append(MessageBubble(message, is_user=True))
+        self.chat_messages.update()
 
     def clear_user_input(self):
-        self.clear_input()
+        self.user_input.value = ""
+        self.user_input.update()
 
     def show_loading_indicator(self):
-        # Implement loading indicator if needed
-        pass
+        self.chat_messages.controls.append(ft.ProgressRing())
+        self.chat_messages.update()
 
     def hide_loading_indicator(self):
-        # Implement hiding loading indicator if needed
-        pass
+        if isinstance(self.chat_messages.controls[-1], ft.ProgressRing):
+            self.chat_messages.controls.pop()
+            self.chat_messages.update()
