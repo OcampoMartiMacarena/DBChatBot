@@ -21,9 +21,6 @@ dialogue_manager = DialogueManager()
 @app.post("/chat", response_model=BotResponse)
 async def chat(chat_history: ChatHistoryModel):
     try:
-        # Process the chat history and generate a response
-        # This is where you'd call your chatbot logic
-        # For now, let's just return a dummy response
         response = "This is a dummy response from the server."
         is_ticket_closed = False
 
