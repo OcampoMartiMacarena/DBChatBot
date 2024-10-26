@@ -22,45 +22,33 @@ class ChatModel(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
 
 class Intent(Enum):
-    # ACCOUNT
-    CREATE_ACCOUNT = auto()
-    DELETE_ACCOUNT = auto()
-    EDIT_ACCOUNT = auto()
-    SWITCH_ACCOUNT = auto()
-
-    # CANCELLATION_FEE
-    CHECK_CANCELLATION_FEE = auto()
-
-    # DELIVERY
-    DELIVERY_OPTIONS = auto()
-
-    # FEEDBACK
-    COMPLAINT = auto()
-    REVIEW = auto()
-
-    # INVOICE
-    CHECK_INVOICE = auto()
-    GET_INVOICE = auto()
-
-    # NEWSLETTER
-    NEWSLETTER_SUBSCRIPTION = auto()
-
-    # ORDER
-    CANCEL_ORDER = auto()
-    CHANGE_ORDER = auto()
-    PLACE_ORDER = auto()
-
-    # PAYMENT
-    CHECK_PAYMENT_METHODS = auto()
-    PAYMENT_ISSUE = auto()
-
-    # REFUND
-    CHECK_REFUND_POLICY = auto()
-    TRACK_REFUND = auto()
-
-    # SHIPPING_ADDRESS
-    CHANGE_SHIPPING_ADDRESS = auto()
-    SET_UP_SHIPPING_ADDRESS = auto()
+    create_account = auto()
+    delete_account = auto()
+    edit_account = auto()
+    recover_password = auto()
+    registration_problems = auto()
+    switch_account = auto()
+    check_cancellation_fee = auto()
+    contact_customer_service = auto()
+    contact_human_agent = auto()
+    delivery_options = auto()
+    delivery_period = auto()
+    complaint = auto()
+    review = auto()
+    check_invoice = auto()
+    get_invoice = auto()
+    cancel_order = auto()
+    change_order = auto()
+    place_order = auto()
+    track_order = auto()
+    check_payment_methods = auto()
+    payment_issue = auto()
+    check_refund_policy = auto()
+    get_refund = auto()
+    track_refund = auto()
+    change_shipping_address = auto()
+    set_up_shipping_address = auto()
+    newsletter_subscription = auto()
 
 class ChatPresenter:
     def __init__(self, view: ViewProtocol, page: ft.Page):
