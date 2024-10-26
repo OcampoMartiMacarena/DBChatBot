@@ -6,6 +6,24 @@ class Message:
         self.sender = sender
         self.msg = msg
 
+class ChatHistoryManager:
+    def __init__(self):
+        self.chat_history: List[Message] = []
+        self.bot_msg: str = ""
+        self.is_ticket_closed: bool = False
+
+    def add_message(self, sender: str, msg: str):
+        self.chat_history.append(Message(sender, msg))
+
+    def set_bot_response(self, response: str, ticket_closed: bool):
+        self.bot_msg = response
+        self.is_ticket_closed = ticket_closed
+
+    def save_last_message(self):
+        if self.bot_msg:
+            self.add_message("bot", self.bot_msg)
+            self.bot_msg = ""
+
 class MockDialogueProcessor:
     def __init__(self):
         self.responses = {
@@ -31,18 +49,25 @@ class MockDialogueProcessor:
             ],
         }
 
-    def generate_response(self, chat_history: List[Message]) -> Tuple[str, bool]:
-        if not chat_history:
-            return random.choice(self.responses["hello"]), False
+    def generate_response(self, chat_manager: ChatHistoryManager) -> None:
+        if not chat_manager.chat_history:
+            response = random.choice(self.responses["hello"])
+            chat_manager.set_bot_response(response, False)
+            return
 
-        last_message = chat_history[-1].msg.lower().strip()
+        last_message = chat_manager.chat_history[-1].msg.lower().strip()
         
         for key, responses in self.responses.items():
             if key in last_message:
-                return random.choice(responses), False
+                response = random.choice(responses)
+                chat_manager.set_bot_response(response, False)
+                return
 
         # Check if the conversation should be closed
         if "goodbye" in last_message or "thank you" in last_message:
-            return "Thank you for contacting our support team. Is there anything else I can help you with before we conclude our chat?", True
+            response = "Thank you for contacting our support team. Is there anything else I can help you with before we conclude our chat?"
+            chat_manager.set_bot_response(response, True)
+            return
 
-        return "I apologize, but I'm not sure I fully understood your question. Could you please provide more details or rephrase your inquiry? I'm here to help and want to make sure I address your needs correctly.", False
+        response = "I apologize, but I'm not sure I fully understood your question. Could you please provide more details or rephrase your inquiry? I'm here to help and want to make sure I address your needs correctly."
+        chat_manager.set_bot_response(response, False)

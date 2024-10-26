@@ -1,6 +1,7 @@
 from pydantic import BaseModel, Field
-from typing import Protocol, List
-from domain.mock_dialogue_processor import MockDialogueProcessor, Message
+from typing import Protocol, List, Callable
+from domain.mock_dialogue_processor import MockDialogueProcessor, Message, ChatHistoryManager
+import flet as ft
 
 class ViewProtocol(Protocol):
     def get_user_message(self) -> str: ...
@@ -18,10 +19,12 @@ class ChatModel(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
 
 class ChatPresenter:
-    def __init__(self, view: ViewProtocol):
+    def __init__(self, view: ViewProtocol, page: ft.Page):
         self.model = ChatModel()
         self.view = view
+        self.page = page
         self.dialogue_processor = MockDialogueProcessor()
+        self.chat_history_manager = ChatHistoryManager()
 
     def start_chat(self):
         welcome_message = "Hello! I'm your AI assistant. How can I help you today?"
@@ -42,11 +45,15 @@ class ChatPresenter:
         # Add user message to conversation history
         self.model.conversation_history.append({"role": "user", "content": message})
 
-        # Convert conversation history to List[Message]
-        chat_history = [Message(msg["role"], msg["content"]) for msg in self.model.conversation_history]
+        # Add user message to chat history manager
+        self.chat_history_manager.add_message("user", message)
 
         # Generate bot response using MockDialogueProcessor
-        bot_response, is_ticket_closed = self.dialogue_processor.generate_response(chat_history)
+        self.dialogue_processor.generate_response(self.chat_history_manager)
+
+        # Get the bot response from the chat history manager
+        bot_response = self.chat_history_manager.bot_msg
+        is_ticket_closed = self.chat_history_manager.is_ticket_closed
 
         # Hide loading indicator
         self.view.hide_loading_indicator()
@@ -57,9 +64,33 @@ class ChatPresenter:
         # Add bot response to conversation history
         self.model.conversation_history.append({"role": "assistant", "content": bot_response})
 
+        # Save the bot message to the chat history manager
+        self.chat_history_manager.save_last_message()
+
         # Clear user input
         self.view.clear_user_input()
 
         # If the ticket is closed, you might want to handle it here
         if is_ticket_closed:
             self.view.display_bot_message("The support ticket has been closed. Thank you for using our service!")
+
+    def get_chat_history(self):
+        return self.chat_history_manager.chat_history
+
+    def print_chat_history(self):
+        print("\nChat History:")
+        for message in self.chat_history_manager.chat_history:
+            print(f"{message.sender}: {message.msg}")
+
+    def handle_send(self, message):
+        self.process_user_message(message)
+
+    def end_conversation(self, e):
+        self.print_chat_history()
+        snack_bar = ft.SnackBar(content=ft.Text("Chat history printed to console"))
+        self.page.overlay.append(snack_bar)
+        snack_bar.open = True
+        self.page.update()
+
+    def set_on_send_handler(self, chat_view):
+        chat_view.on_send = self.handle_send
