@@ -21,9 +21,12 @@ dialogue_manager = DialogueManager()
 @app.post("/chat", response_model=BotResponse)
 async def chat(chat_history: ChatHistoryModel):
     try:
-        response = "This is a dummy response from the server."
-        is_ticket_closed = False
-
-        return BotResponse(response=response, is_ticket_closed=is_ticket_closed)
+        # Convert ChatHistoryModel to List[Message]
+        messages = [Message(role=msg.sender, content=msg.msg) for msg in chat_history.chat_history]
+        
+        # Get response from DialogueManager
+        response = dialogue_manager.get_response(messages)
+        
+        return BotResponse(response=response.bot_msg, is_ticket_closed=response.is_ticket_closed)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
