@@ -21,34 +21,34 @@ class BotResponse(BaseModel):
 class ChatModel(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
 
-class Intent(Enum):
-    create_account = auto()
-    delete_account = auto()
-    edit_account = auto()
-    recover_password = auto()
-    registration_problems = auto()
-    switch_account = auto()
-    check_cancellation_fee = auto()
-    contact_customer_service = auto()
-    contact_human_agent = auto()
-    delivery_options = auto()
-    delivery_period = auto()
-    complaint = auto()
-    review = auto()
-    check_invoice = auto()
-    get_invoice = auto()
-    cancel_order = auto()
-    change_order = auto()
-    place_order = auto()
-    track_order = auto()
-    check_payment_methods = auto()
-    payment_issue = auto()
-    check_refund_policy = auto()
-    get_refund = auto()
-    track_refund = auto()
-    change_shipping_address = auto()
-    set_up_shipping_address = auto()
-    newsletter_subscription = auto()
+class Intent(str, Enum):
+    create_account = "create_account"
+    delete_account = "delete_account"
+    edit_account = "edit_account"
+    recover_password = "recover_password"
+    registration_problems = "registration_problems"
+    switch_account = "switch_account"
+    check_cancellation_fee = "check_cancellation_fee"
+    contact_customer_service = "contact_customer_service"
+    contact_human_agent = "contact_human_agent"
+    delivery_options = "delivery_options"
+    delivery_period = "delivery_period"
+    complaint = "complaint"
+    review = "review"
+    check_invoice = "check_invoice"
+    get_invoice = "get_invoice"
+    cancel_order = "cancel_order"
+    change_order = "change_order"
+    place_order = "place_order"
+    track_order = "track_order"
+    check_payment_methods = "check_payment_methods"
+    payment_issue = "payment_issue"
+    check_refund_policy = "check_refund_policy"
+    get_refund = "get_refund"
+    track_refund = "track_refund"
+    change_shipping_address = "change_shipping_address"
+    set_up_shipping_address = "set_up_shipping_address"
+    newsletter_subscription = "newsletter_subscription"
 
 class ChatPresenter:
     def __init__(self, view: ViewProtocol, page: ft.Page):
