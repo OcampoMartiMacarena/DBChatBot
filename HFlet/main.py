@@ -12,9 +12,7 @@ def main(page: ft.Page):
 
     chat_presenter.set_on_send_handler(chat_view)
 
-    end_button = ft.ElevatedButton("End Conversation", on_click=chat_presenter.end_conversation)
-
-    page.add(chat_view, end_button)
-    chat_presenter.start_chat()
+    page.add(chat_view)
+   
 
 ft.app(target=main)

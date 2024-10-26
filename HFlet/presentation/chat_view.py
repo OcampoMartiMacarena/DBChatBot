@@ -69,6 +69,15 @@ class ChatView(ft.UserControl):
             icon=ft.icons.SEND,
             on_click=self.send_message
         )
+        self.end_conversation_button = ft.ElevatedButton(
+            text="End Conversation",
+            on_click=self.show_ticket_closed_popup
+        )
+        self.new_ticket_button = ft.ElevatedButton(
+            text="Open New Ticket",
+            on_click=self.start_new_conversation,
+            visible=False
+        )
 
     def build(self):
         return ft.Column([
@@ -76,7 +85,8 @@ class ChatView(ft.UserControl):
             ft.Row([
                 self.user_input,
                 self.send_button
-            ])
+            ]),
+            self.end_conversation_button,
         ], expand=self.expand)
 
     def send_message(self, _):
@@ -107,3 +117,68 @@ class ChatView(ft.UserControl):
         if isinstance(self.chat_messages.controls[-1], ft.ProgressRing):
             self.chat_messages.controls.pop()
             self.chat_messages.update()
+
+    def show_ticket_closed_popup(self, _):
+        def close_dlg(_):
+            self.page.dialog.open = False
+            self.page.update()
+            self.end_conversation()
+
+        self.page.dialog = ft.AlertDialog(
+            title=ft.Text("Ticket Closed"),
+            content=ft.Text("The conversation has ended and the ticket is now closed."),
+            actions=[
+                ft.TextButton("OK", on_click=close_dlg),
+            ],
+            actions_alignment=ft.MainAxisAlignment.END,
+        )
+        self.page.dialog.open = True
+        self.page.update()
+
+    def end_conversation(self):
+        # Display chat history in console
+        self.display_chat_history()
+        
+        # Clear all messages
+        self.chat_messages.controls.clear()
+        
+        # Hide input row and end conversation button
+        self.user_input.visible = False
+        self.send_button.visible = False
+        self.end_conversation_button.visible = False
+        
+        # Show "Open New Ticket" button in the middle
+        self.new_ticket_button.visible = True
+        
+        # Center the "Open New Ticket" button
+        self.chat_messages.controls.append(
+            ft.Container(
+                content=self.new_ticket_button,
+                alignment=ft.alignment.center,
+                expand=True
+            )
+        )
+        
+        self.update()
+
+    def start_new_conversation(self, _):
+        # Clear the chat messages
+        self.chat_messages.controls.clear()
+        
+        # Show input row and end conversation button
+        self.user_input.visible = True
+        self.send_button.visible = True
+        self.end_conversation_button.visible = True
+        
+        # Hide "Open New Ticket" button
+        self.new_ticket_button.visible = False
+        
+        self.update()
+
+    def display_chat_history(self):
+        print("Chat History:")
+        for message in self.chat_messages.controls:
+            if isinstance(message, MessageBubble):
+                sender = "User" if message.alignment == ft.alignment.center_right else "Bot"
+                print(f"{sender}: {message.content.content.value}")
+        print("End of Chat History")

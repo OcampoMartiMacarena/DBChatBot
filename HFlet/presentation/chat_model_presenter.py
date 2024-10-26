@@ -26,14 +26,11 @@ class ChatPresenter:
         self.dialogue_processor = MockDialogueProcessor()
         self.chat_history_manager = ChatHistoryManager()
 
-    def start_chat(self):
-        welcome_message = "Hello! I'm your AI assistant. How can I help you today?"
-        self.view.display_bot_message(welcome_message)
-        self.model.conversation_history.append({"role": "assistant", "content": welcome_message})
+    
 
     def clear_chat_history(self):
         self.model.conversation_history.clear()
-        self.start_chat()
+        
 
     def process_user_message(self, message):
         # Display user message
@@ -85,12 +82,18 @@ class ChatPresenter:
     def handle_send(self, message):
         self.process_user_message(message)
 
-    def end_conversation(self, e):
-        self.print_chat_history()
-        snack_bar = ft.SnackBar(content=ft.Text("Chat history printed to console"))
-        self.page.overlay.append(snack_bar)
-        snack_bar.open = True
-        self.page.update()
-
     def set_on_send_handler(self, chat_view):
         chat_view.on_send = self.handle_send
+
+    def new_ticket(self):
+        # Clear the chat history
+        self.clear_chat_history()
+        self.chat_history_manager.clear_history()
+
+        # Display a message indicating a new chat has started
+        new_chat_message = "A new support ticket has been opened. How can I assist you today?"
+        self.view.display_bot_message(new_chat_message)
+
+        # Add the new chat message to the conversation history and chat history manager
+        self.model.conversation_history.append({"role": "assistant", "content": new_chat_message})
+        self.chat_history_manager.add_message("assistant", new_chat_message)
