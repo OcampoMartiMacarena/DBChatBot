@@ -39,9 +39,14 @@ class Message(BaseModel):
     role: str
     content: str
 
-class Response(BaseModel):
-    thought_process_for_intent: str
+class PredictedIntent(BaseModel):
     intent: Intent
+    ticket_id: str
+
+class ResponseModel(BaseModel):
+    intent: str
+    thought_process_for_intent: str
+    predicted_intents: List[PredictedIntent]
     bot_msg: str
     is_ticket_closed: bool
 
@@ -60,14 +65,14 @@ class DialogueManager:
         Determine the intent category, generate a bot message, and decide if the ticket should be closed.
         """
 
-    def get_response(self, chat_history: List[Message]) -> Response:
+    def get_response(self, chat_history: List[Message]) -> ResponseModel:
         prompt = f"""
         Given the following chat history, provide an appropriate response:
 
         Chat History:
         {self._format_chat_history(chat_history)}
 
-        Respond with the intent category, bot message, and whether the ticket should be closed.
+        Respond with a list of predicted intents (including ticket IDs), bot message, and whether the ticket should be closed.
         """
 
         messages = [
@@ -77,7 +82,7 @@ class DialogueManager:
 
         response = self.client.chat.completions.create(
             messages=messages,
-            response_model=Response
+            response_model=ResponseModel
         )
 
         return response
