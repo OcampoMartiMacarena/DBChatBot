@@ -6,6 +6,9 @@ from dotenv import load_dotenv
 import google.generativeai as genai
 import instructor
 
+from mistralai import Mistral
+
+
 class Intent(str, Enum):
     create_account = "create_account"
     delete_account = "delete_account"
@@ -49,11 +52,20 @@ class DialogueManager:
     def __init__(self):
         # Load environment variables and configure the API key
         load_dotenv()
-        genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
 
         # Select the model and create the client
-        self.model = genai.GenerativeModel('gemini-1.5-flash')
-        self.client = instructor.from_gemini(client=self.model, mode=instructor.Mode.GEMINI_JSON)
+        self.model = Mistral(api_key=os.environ.get("MISTRAL_API_KEY"))
+        self.client = instructor.from_mistral(
+            client=self.model,
+            model="open-mistral-nemo",
+            mode=instructor.Mode.MISTRAL_TOOLS,
+            max_tokens=1000,
+        )
+
+        # # Select the model and create the client
+        # genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
+        # self.model = genai.GenerativeModel('gemini-1.5-flash')
+        # self.client = instructor.from_gemini(client=self.model, mode=instructor.Mode.GEMINI_JSON)
 
         self.system_message = """
         You are an AI assistant for a customer service chatbot. Analyze the chat history and provide an appropriate response.
@@ -79,6 +91,8 @@ class DialogueManager:
             messages=messages,
             response_model=Response
         )
+
+        print(response)
 
         return response
 
