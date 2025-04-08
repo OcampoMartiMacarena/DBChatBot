@@ -28,5 +28,7 @@ async def chat(chat_history: ChatHistoryModel):
         response = dialogue_manager.get_response(messages)
         
         return BotResponse(response=response.bot_msg, is_ticket_closed=response.is_ticket_closed)
+    except HTTPException as he:
+        raise he
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
