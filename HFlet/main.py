@@ -1,3 +1,7 @@
+import warnings
+# Suppress deprecation warnings from Google Protobuf
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="google._upb._message")
+
 import flet as ft
 from presentation.chat_view import ChatView
 from presentation.chat_model_presenter import ChatPresenter

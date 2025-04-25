@@ -1,125 +1,112 @@
-from pydantic import BaseModel, Field
-from typing import List
-from enum import Enum, auto
+import warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="google._upb._message")
+
 import os
+import json
+import re
+import time
+from typing import List
 from dotenv import load_dotenv
 import google.generativeai as genai
-import instructor
-import time
 from fastapi import HTTPException
+from pydantic import ValidationError
 
-from mistralai import Mistral
+from HService.domain.models import Intent, Message, Response, Product
+from HService.service.product_service import get_all_products
 
 
-class Intent(str, Enum):
-    create_account = "create_account"
-    delete_account = "delete_account"
-    edit_account = "edit_account"
-    recover_password = "recover_password"
-    registration_problems = "registration_problems"
-    switch_account = "switch_account"
-    check_cancellation_fee = "check_cancellation_fee"
-    contact_customer_service = "contact_customer_service"
-    contact_human_agent = "contact_human_agent"
-    delivery_options = "delivery_options"
-    delivery_period = "delivery_period"
-    complaint = "complaint"
-    review = "review"
-    check_invoice = "check_invoice"
-    get_invoice = "get_invoice"
-    cancel_order = "cancel_order"
-    change_order = "change_order"
-    place_order = "place_order"
-    track_order = "track_order"
-    check_payment_methods = "check_payment_methods"
-    payment_issue = "payment_issue"
-    check_refund_policy = "check_refund_policy"
-    get_refund = "get_refund"
-    track_refund = "track_refund"
-    change_shipping_address = "change_shipping_address"
-    set_up_shipping_address = "set_up_shipping_address"
-    newsletter_subscription = "newsletter_subscription"
+# ---------------- Gemini Wrapper ----------------
+class GeminiWrapper:
+    def __init__(self):
+        load_dotenv()
+        api_key = os.getenv("GOOGLE_API_KEY")
+        if not api_key:
+            raise ValueError("GOOGLE_API_KEY not found in environment variables")
 
-class Message(BaseModel):
-    role: str
-    content: str
+        genai.configure(api_key=api_key)
+        self.model = genai.GenerativeModel("gemini-1.5-pro")
+        self.last_request_time = 0
+        self.request_interval = 0
 
-class Response(BaseModel):
-    thought_process_for_intent: str
-    intent: Intent
-    bot_msg: str
-    is_ticket_closed: bool
+    def extract_first_json_block(self, text: str) -> str:
+        match = re.search(r'{.*}', text, re.DOTALL)
+        if match:
+            return match.group(0)
+        else:
+            raise ValueError("No valid JSON block found.")
 
+    def send(self, prompt: str, response_model):
+        try:
+            response = self.model.generate_content(prompt)
+            content = response.text.strip()
+            print("Raw Gemini response:\n", content)  # Debug print
+
+            try:
+                json_str = self.extract_first_json_block(content)
+                data = json.loads(json_str)
+
+                if "intent" in data and data["intent"] not in [e.value for e in Intent]:
+                    raise HTTPException(status_code=500, detail=f"Invalid intent value: {data['intent']}")
+
+                return response_model(**data)
+            except (json.JSONDecodeError, ValidationError, ValueError) as e:
+                print(f"Error parsing response: {e}")
+                raise HTTPException(status_code=500, detail="Invalid response format from Gemini.")
+
+        except Exception as e:
+            print(f"Error while contacting Gemini: {str(e)}")
+            if "rate limit" in str(e).lower():
+                raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
+            raise HTTPException(status_code=500, detail="An error occurred while processing your request.")
+
+# ---------------- Dialogue Manager ----------------
 class DialogueManager:
     def __init__(self):
-        # Load environment variables and configure the API key
-        load_dotenv()
-        
-        api_key = os.environ.get("MISTRAL_API_KEY")
-        if not api_key:
-            raise ValueError("MISTRAL_API_KEY not found in environment variables")
-        
-        # Select the model and create the client
-        self.model = Mistral(api_key=api_key)
-        self.client = instructor.from_mistral(
-            client=self.model,
-            model="open-mistral-nemo",  # Verify this is the correct model
-            mode=instructor.Mode.MISTRAL_TOOLS,
-            max_tokens=1000,
+        self.gemini = GeminiWrapper()
+        self.system_message = (
+            "You are an expert AI customer service assistant trained to resolve all user requests without human intervention. "
+            "You are autonomous and confident in your answers, and never refer the user to a human agent. "
+            "Always analyze the chat history carefully, detect the user's intent, and respond with helpful, complete, and proactive solutions. "
+            "IMPORTANT: Never say that you are an AI or mention that you cannot do something. "
+            "Do not ask if the user wants to be transferred or say that an agent will join. "
+            "Your job is to fully handle the situation until the ticket can be closed."
         )
-
-        # # Select the model and create the client
-        # genai.configure(api_key=os.getenv("GOOGLE_API_KEY"))
-        # self.model = genai.GenerativeModel('gemini-1.5-flash')
-        # self.client = instructor.from_gemini(client=self.model, mode=instructor.Mode.GEMINI_JSON)
-
-        self.system_message = """
-        You are an AI assistant for a customer service chatbot. Analyze the chat history and provide an appropriate response.
-        Determine the intent category, generate a bot message, and decide if the ticket should be closed.
-        IMPORTANT: Do not respond with 'Hello, how can I assist you today?' unless the chat history is empty.
-        """
-
-        self.last_request_time = 0
-        self.request_interval = 1  # Minimum time between requests in seconds
 
     def get_response(self, chat_history: List[Message]) -> Response:
         formatted_history = self._format_chat_history(chat_history)
-        print(f"Formatted chat history: {formatted_history}")  # Debug print
-        
-        # Implement rate limiting
-        current_time = time.time()
-        if current_time - self.last_request_time < self.request_interval:
-            time.sleep(self.request_interval - (current_time - self.last_request_time))
-        self.last_request_time = time.time()
+
+        # Traer productos desde base de datos
+        products = get_all_products()
+        product_info = "\n".join([
+            f"- {p.name}: {p.description}. Precio: ${p.price}. Stock: {'Sí' if p.in_stock else 'No'}. Descuento: {p.discount_percent}%."
+            for p in products
+        ])
+
+        valid_intents = ', '.join([f'"{e.value}"' for e in Intent])
 
         prompt = f"""
-        Given the following chat history, provide an appropriate response:
+{self.system_message}
 
-        Chat History:
-        {formatted_history}
+Estos son los productos disponibles actualmente:
 
-        Respond with the intent category, bot message, and whether the ticket should be closed.
-        Remember to analyze the chat history and provide a contextual response.
-        Do not repeat previous bot messages. Provide new, relevant information or ask for more details.
-        """
+{product_info}
 
-        messages = [
-            {"role": "system", "content": self.system_message},
-            {"role": "user", "content": prompt}
-        ]
+Historial del chat:
+{formatted_history}
 
-        try:
-            response = self.client.chat.completions.create(
-                messages=messages,
-                response_model=Response
-            )
-            print(f"Raw response from Mistral: {response}")  # Debug print
-            return response
-        except Exception as e:
-            print(f"Error occurred while getting response from Mistral: {str(e)}")
-            if "rate limit exceeded" in str(e).lower():
-                raise HTTPException(status_code=429, detail="Too many requests. Please try again later.")
-            raise HTTPException(status_code=500, detail="An error occurred while processing your request.")
+Respondé solo con un objeto JSON como este:
+{{
+  "thought_process_for_intent": "...",
+  "intent": uno de los siguientes valores: {valid_intents},
+  "bot_msg": "...",
+  "is_ticket_closed": true
+}}
+
+Usá los datos reales de productos cuando sea relevante.
+Nunca inventes productos. No uses otros valores de intención que no estén listados.
+Respondé de forma clara, breve, y útil, como un agente experto.
+"""
+        return self.gemini.send(prompt, response_model=Response)
 
     def _format_chat_history(self, chat_history: List[Message]) -> str:
         if not chat_history:

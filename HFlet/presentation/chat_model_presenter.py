@@ -1,10 +1,17 @@
 from enum import Enum, auto
 from pydantic import BaseModel, Field
 from typing import Protocol, List, Callable
-from domain.api_dialogue_processor import APIDialogueProcessor, ChatHistoryManager
+import sys
+import os
+import requests
+
+# Add the parent directory to the path so we can import from HService
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
+
+# Import from HService
+from HService.domain.dialogue_manager import Message, Response, Intent
+
 import flet as ft
-
-
 
 class ViewProtocol(Protocol):
     def get_user_message(self) -> str: ...
@@ -21,48 +28,21 @@ class BotResponse(BaseModel):
 class ChatModel(BaseModel):
     conversation_history: List[dict] = Field(default_factory=list)
 
-class Intent(str, Enum):
-    create_account = "create_account"
-    delete_account = "delete_account"
-    edit_account = "edit_account"
-    recover_password = "recover_password"
-    registration_problems = "registration_problems"
-    switch_account = "switch_account"
-    check_cancellation_fee = "check_cancellation_fee"
-    contact_customer_service = "contact_customer_service"
-    contact_human_agent = "contact_human_agent"
-    delivery_options = "delivery_options"
-    delivery_period = "delivery_period"
-    complaint = "complaint"
-    review = "review"
-    check_invoice = "check_invoice"
-    get_invoice = "get_invoice"
-    cancel_order = "cancel_order"
-    change_order = "change_order"
-    place_order = "place_order"
-    track_order = "track_order"
-    check_payment_methods = "check_payment_methods"
-    payment_issue = "payment_issue"
-    check_refund_policy = "check_refund_policy"
-    get_refund = "get_refund"
-    track_refund = "track_refund"
-    change_shipping_address = "change_shipping_address"
-    set_up_shipping_address = "set_up_shipping_address"
-    newsletter_subscription = "newsletter_subscription"
-
 class ChatPresenter:
     def __init__(self, view: ViewProtocol, page: ft.Page):
         self.model = ChatModel()
         self.view = view
         self.page = page
-        self.dialogue_processor = APIDialogueProcessor()
-        self.chat_history_manager = ChatHistoryManager()
-
-    
+        self.api_url = "http://localhost:8000"
+        self.conversation_history = []
+        self.bot_msg = ""
+        self.is_ticket_closed = False
 
     def clear_chat_history(self):
         self.model.conversation_history.clear()
-        
+        self.conversation_history = []
+        self.bot_msg = ""
+        self.is_ticket_closed = False
 
     def process_user_message(self, message):
         # Display user message
@@ -73,43 +53,53 @@ class ChatPresenter:
 
         # Add user message to conversation history
         self.model.conversation_history.append({"role": "user", "content": message})
+        self.conversation_history.append({"role": "user", "content": message})
 
-        # Add user message to chat history manager
-        self.chat_history_manager.add_message("user", message)
-
-        # Generate bot response using APIDialogueProcessor
-        self.dialogue_processor.generate_response(self.chat_history_manager)
-
-        # Get the bot response from the chat history manager
-        bot_response = self.chat_history_manager.bot_msg
-        is_ticket_closed = self.chat_history_manager.is_ticket_closed
+        # Generate bot response using HService API
+        try:
+            # Call the API
+            response = requests.post(
+                f"{self.api_url}/chat",
+                json={"chat_history": [{"sender": msg["role"], "msg": msg["content"]} for msg in self.conversation_history]}
+            )
+            
+            if response.status_code == 200:
+                result = response.json()
+                self.bot_msg = result["response"]
+                self.is_ticket_closed = result["is_ticket_closed"]
+            else:
+                error_msg = f"API error: {response.status_code} - {response.text}"
+                self.bot_msg = error_msg
+                self.is_ticket_closed = False
+        except Exception as e:
+            error_msg = f"Error connecting to API: {str(e)}"
+            self.bot_msg = error_msg
+            self.is_ticket_closed = False
 
         # Hide loading indicator
         self.view.hide_loading_indicator()
 
         # Display bot response
-        self.view.display_bot_message(bot_response)
+        self.view.display_bot_message(self.bot_msg)
 
         # Add bot response to conversation history
-        self.model.conversation_history.append({"role": "assistant", "content": bot_response})
-
-        # Save the bot message to the chat history manager
-        self.chat_history_manager.save_last_message()
+        self.model.conversation_history.append({"role": "assistant", "content": self.bot_msg})
+        self.conversation_history.append({"role": "assistant", "content": self.bot_msg})
 
         # Clear user input
         self.view.clear_user_input()
 
         # If the ticket is closed, you might want to handle it here
-        if is_ticket_closed:
+        if self.is_ticket_closed:
             self.view.display_bot_message("The support ticket has been closed. Thank you for using our service!")
 
     def get_chat_history(self):
-        return self.chat_history_manager.chat_history
+        return self.conversation_history
 
     def print_chat_history(self):
         print("\nChat History:")
-        for message in self.chat_history_manager.chat_history:
-            print(f"{message.sender}: {message.msg}")
+        for message in self.conversation_history:
+            print(f"{message['role']}: {message['content']}")
 
     def handle_send(self, message):
         self.process_user_message(message)
@@ -120,12 +110,11 @@ class ChatPresenter:
     def new_ticket(self):
         # Clear the chat history
         self.clear_chat_history()
-        self.chat_history_manager.clear_history()
 
         # Display a message indicating a new chat has started
         new_chat_message = "A new support ticket has been opened. How can I assist you today?"
         self.view.display_bot_message(new_chat_message)
 
-        # Add the new chat message to the conversation history and chat history manager
+        # Add the new chat message to the conversation history
         self.model.conversation_history.append({"role": "assistant", "content": new_chat_message})
-        self.chat_history_manager.add_message("assistant", new_chat_message)
+        self.conversation_history.append({"role": "assistant", "content": new_chat_message})

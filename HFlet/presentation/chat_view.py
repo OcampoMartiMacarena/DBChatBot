@@ -54,7 +54,7 @@ class MessageBubble(ft.Container):
         else:
             self.margin = ft.margin.only(left=10, right=80, top=5, bottom=5)
             
-class ChatView(ft.UserControl):  # Change back to UserControl for now
+class ChatView(ft.Container):  # Changed from ft.View to ft.Container
     def __init__(self, on_send: Callable[[str], None], expand: bool = False):
         super().__init__()
         self.on_send = on_send
@@ -78,9 +78,9 @@ class ChatView(ft.UserControl):  # Change back to UserControl for now
             on_click=self.start_new_conversation,
             visible=False
         )
-
-    def build(self):
-        return ft.Column([
+        
+        # Set the content directly in the constructor
+        self.content = ft.Column([
             self.chat_messages,
             ft.Row([
                 self.user_input,
@@ -88,6 +88,10 @@ class ChatView(ft.UserControl):  # Change back to UserControl for now
             ]),
             self.end_conversation_button,
         ], expand=self.expand)
+        
+        # Set container properties
+        self.expand = expand
+        self.padding = ft.padding.all(10)
 
     def send_message(self, _):
         message = self.user_input.value

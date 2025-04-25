@@ -1,7 +1,7 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 from typing import List
-from domain.dialogue_manager import DialogueManager, Message
+from HService.domain.dialogue_manager import DialogueManager, Message
 
 app = FastAPI()
 
